@@ -5,12 +5,16 @@ from datetime import datetime
 import time
 import requests
 import random
-import os  # Required for opening folders
+import os  
 from tkintermapview import TkinterMapView
 
-# --- CONFIGURATION ---
+
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("dark-blue")
+
+
+DESKTOP_PATH = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
+LOG_FILE_PATH = os.path.join(DESKTOP_PATH, "honeyguard_logs.txt")
 
 class ThreatIntel:
     """The 'Brain' of the system."""
@@ -46,10 +50,10 @@ class ModernHoneyGuard(ctk.CTk):
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
-        # --- SIDEBAR ---
+   
         self.sidebar_frame = ctk.CTkFrame(self, width=200, corner_radius=0)
         self.sidebar_frame.grid(row=0, column=0, sticky="nsew")
-        self.sidebar_frame.grid_rowconfigure(6, weight=1) # Adjusted for new button
+        self.sidebar_frame.grid_rowconfigure(6, weight=1) 
 
         self.logo_label = ctk.CTkLabel(self.sidebar_frame, text="🛡️ HoneyGuard", font=ctk.CTkFont(size=20, weight="bold"))
         self.logo_label.grid(row=0, column=0, padx=20, pady=(20, 10))
@@ -67,14 +71,14 @@ class ModernHoneyGuard(ctk.CTk):
         self.btn_stop = ctk.CTkButton(self.sidebar_frame, text="STOP SYSTEM", fg_color="#FF4444", hover_color="#CC0000", state="disabled", command=self.stop_server)
         self.btn_stop.grid(row=4, column=0, padx=20, pady=10)
         
-        # --- NEW: OPEN FOLDER BUTTON ---
-        self.btn_folder = ctk.CTkButton(self.sidebar_frame, text="📂 OPEN LOGS FOLDER", fg_color="#555555", hover_color="#333333", command=self.open_log_folder)
+     
+        self.btn_folder = ctk.CTkButton(self.sidebar_frame, text=" OPEN LOG FILE", fg_color="#555555", hover_color="#333333", command=self.open_log_file)
         self.btn_folder.grid(row=5, column=0, padx=20, pady=10)
 
-        self.btn_sim = ctk.CTkButton(self.sidebar_frame, text="⚠️ SIMULATE ATTACK", fg_color="#3B8ED0", hover_color="#1F6AA5", command=self.simulate_attack)
+        self.btn_sim = ctk.CTkButton(self.sidebar_frame, text=" SIMULATE ATTACK", fg_color="#3B8ED0", hover_color="#1F6AA5", command=self.simulate_attack)
         self.btn_sim.grid(row=6, column=0, padx=20, pady=10, sticky="s")
 
-        # --- MAIN DASHBOARD ---
+      
         self.main_frame = ctk.CTkFrame(self, corner_radius=0, fg_color="#242424") 
         self.main_frame.grid(row=0, column=1, sticky="nsew", padx=20, pady=20)
 
@@ -87,7 +91,7 @@ class ModernHoneyGuard(ctk.CTk):
         self.card_last_risk = self.create_stat_card(self.stats_frame, "Threat Level", "None", "#888888")
         self.card_last_risk.pack(side="left", padx=(10, 0), expand=True, fill="x")
 
-        self.map_label = ctk.CTkLabel(self.main_frame, text="🌍 Live Global Threat Map", font=ctk.CTkFont(size=16, weight="bold"))
+        self.map_label = ctk.CTkLabel(self.main_frame, text=" Live Global Threat Map", font=ctk.CTkFont(size=16, weight="bold"))
         self.map_label.pack(anchor="w", pady=(10, 5))
         self.map_widget = TkinterMapView(self.main_frame, width=800, height=300, corner_radius=10)
         self.map_widget.pack(fill="x", pady=(0, 10))
@@ -95,7 +99,8 @@ class ModernHoneyGuard(ctk.CTk):
         self.map_widget.set_position(20, 0)
         self.map_widget.set_zoom(2)
 
-        self.log_label = ctk.CTkLabel(self.main_frame, text="🛑 Intrusion Logs", font=ctk.CTkFont(size=14, weight="bold"))
+      
+        self.log_label = ctk.CTkLabel(self.main_frame, text=f" Intrusion Logs ({LOG_FILE_PATH})", font=ctk.CTkFont(size=12, weight="bold"))
         self.log_label.pack(anchor="w", pady=(5, 5))
         self.log_box = ctk.CTkTextbox(self.main_frame, width=800, height=200, font=("Consolas", 12))
         self.log_box.pack(fill="both", expand=True)
@@ -104,8 +109,16 @@ class ModernHoneyGuard(ctk.CTk):
         self.running = False
         self.attack_count = 0
         
-        # PRINT THE PATH ON STARTUP SO YOU KNOW WHERE IT IS
-        print(f"--- LOGS WILL BE SAVED TO: {os.getcwd()}\\honeyguard_logs.txt ---")
+       
+        print(f"DEBUG: Trying to create file at: {LOG_FILE_PATH}")
+        try:
+            with open(LOG_FILE_PATH, "a") as f:
+                f.write(f"--- SYSTEM STARTUP: {datetime.now()} ---\n")
+            print("SUCCESS: Log file created successfully.")
+            self.log_box.insert("0.0", f"SYSTEM READY. LOGGING TO: {LOG_FILE_PATH}\n")
+        except Exception as e:
+            print(f"CRITICAL ERROR: Could not create file! Reason: {e}")
+            self.log_box.insert("0.0", f"ERROR: Could not create log file. Check permissions!\nError: {e}\n")
 
     def create_stat_card(self, parent, title, value, color):
         frame = ctk.CTkFrame(parent, height=80)
@@ -120,24 +133,31 @@ class ModernHoneyGuard(ctk.CTk):
         children[1].configure(text=new_value)
         if color: children[1].configure(text_color=color)
 
-    # --- LOGGING FUNCTION ---
+  
     def log(self, message):
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         log_entry = f"[{timestamp}] {message}"
+       
         self.log_box.configure(state="normal")
         self.log_box.insert("end", log_entry + "\n")
         self.log_box.see("end")
         self.log_box.configure(state="disabled")
+        
+      
         try:
-            with open("honeyguard_logs.txt", "a", encoding="utf-8") as f:
+            with open(LOG_FILE_PATH, "a", encoding="utf-8") as f:
                 f.write(log_entry + "\n")
-        except Exception as e: print(f"Error saving to file: {e}")
+        except Exception as e: 
+            print(f"File Write Error: {e}")
 
-    # --- NEW: OPEN FOLDER FUNCTION ---
-    def open_log_folder(self):
-        """Opens the directory where the script is running"""
-        path = os.getcwd()
-        os.startfile(path)
+    
+    def open_log_file(self):
+        """Opens the log file itself"""
+        try:
+            os.startfile(LOG_FILE_PATH)
+        except:
+            
+            os.startfile(DESKTOP_PATH)
 
     def start_thread(self):
         try: port = int(self.entry_port.get())
@@ -163,7 +183,6 @@ class ModernHoneyGuard(ctk.CTk):
 
     def run_honeypot(self, port):
         self.log(f"Sensor initialized on port {port}...")
-        self.log(f"Saving logs to: {os.getcwd()}\\honeyguard_logs.txt")
         try:
             self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.server_socket.bind(('0.0.0.0', port))
@@ -212,7 +231,7 @@ class ModernHoneyGuard(ctk.CTk):
 
     def show_alert_popup(self, ip, location, payload, analysis):
         popup = ctk.CTkToplevel(self)
-        popup.title("⚠️ INTRUSION ALERT")
+        popup.title(" INTRUSION ALERT")
         popup.geometry("500x400")
         popup.attributes("-topmost", True) 
         ctk.CTkLabel(popup, text=f"THREAT DETECTED: {analysis['type']}", font=("Arial", 16, "bold"), text_color=analysis['color']).pack(pady=10)
@@ -220,7 +239,7 @@ class ModernHoneyGuard(ctk.CTk):
         info.pack(fill="x", padx=20)
         ctk.CTkLabel(info, text=f"IP: {ip} | {location}", font=("Arial", 12)).pack(anchor="w", padx=10, pady=5)
         ctk.CTkTextbox(info, height=50).pack(fill="x", padx=10)
-        btn_frame = ctk.CTkFrame(popup, fg_color="transparent") 
+        btn_frame = ctk.CTkFrame(popup, fg_color="#242424") 
         btn_frame.pack(fill="x", pady=10)
         btn = ctk.CTkButton(popup, text="CLOSE", command=popup.destroy, fg_color="#444444")
         btn.pack(pady=10)
