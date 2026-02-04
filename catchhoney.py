@@ -4,102 +4,74 @@ import threading
 from datetime import datetime
 import time
 import requests
+import random
+import os  # Added to handle file paths if needed
+from tkintermapview import TkinterMapView
 
-
-ctk.set_appearance_mode("Dark")  
-ctk.set_default_color_theme("dark-blue") 
+# --- CONFIGURATION ---
+ctk.set_appearance_mode("Dark")
+ctk.set_default_color_theme("dark-blue")
 
 class ThreatIntel:
     """
-    The 'Brain' of the system. Matches attack payloads to known signatures
-    and provides industry-standard mitigation advice.
+    The 'Brain' of the system. Matches attack payloads to known signatures.
     """
 
     @staticmethod
-    def get_location(ip_address):
-        """
-        Fetches the geolocation of the IP address using a free API.
-        """
-        
-        if ip_address == "127.0.0.1" or ip_address == "localhost":
-            return "Localhost (Test Lab)"
+    def get_location_data(ip_address):
+        """Fetches the geolocation AND coordinates (Lat/Lon) of the IP."""
+        if ip_address in ["127.0.0.1", "localhost"]:
+            return {"country": "Localhost", "city": "Test Lab", "lat": 0, "lon": 0, "status": "fail"}
 
         try:
-            
+            # Free API (Limit: 45 requests per minute)
             url = f"http://ip-api.com/json/{ip_address}"
-            response = requests.get(url, timeout=5).json()
+            response = requests.get(url, timeout=3).json()
             
             if response['status'] == 'success':
-                return f"{response['country']} ({response['city']})"
+                return {
+                    "country": response['country'],
+                    "city": response['city'],
+                    "lat": response['lat'],
+                    "lon": response['lon'],
+                    "status": "success"
+                }
             else:
-                return "Unknown Location"
-        except Exception as e:
-            return "Lookup Failed"
+                return {"status": "fail"}
+        except:
+            return {"status": "fail"}
     
     @staticmethod
     def analyze(payload):
         payload = payload.lower()
-        
-       
         if any(x in payload for x in ["select *", "union select", "' or 1=1", "drop table", "--"]):
-            return {
-                "type": "SQL Injection (SQLi)",
-                "risk": "CRITICAL",
-                "color": "#FF3333", 
-                "advice": "1. Implement Prepared Statements (Parameterized Queries).\n2. Activate Web Application Firewall (WAF).\n3. Sanitize inputs."
-            }
-            
-        
+            return {"type": "SQL Injection (SQLi)", "risk": "CRITICAL", "color": "#FF3333", 
+                    "advice": "1. Implement Prepared Statements.\n2. Activate WAF rules."}
         elif any(x in payload for x in ["wget", "curl", "cmd.exe", "/bin/sh", "rm -rf", "powershell"]):
-            return {
-                "type": "Remote Code Execution (RCE)",
-                "risk": "EXTREME",
-                "color": "#8B0000", 
-                "advice": "1. Disable shell execution functions.\n2. Run service with least-privilege.\n3. Isolate system in a DMZ."
-            }
-            
-        
-        elif "../" in payload or "..\\" in payload:
-            return {
-                "type": "Directory Traversal",
-                "risk": "HIGH",
-                "color": "#FF8800",
-                "advice": "1. Validate file paths against an allowlist.\n2. Disable directory browsing.\n3. Use chroot jails."
-            }
-            
-        
+            return {"type": "Remote Code Execution", "risk": "EXTREME", "color": "#8B0000", 
+                    "advice": "1. Disable shell execution.\n2. Isolate system in DMZ."}
         elif "<script>" in payload or "javascript:" in payload:
-            return {
-                "type": "Cross-Site Scripting (XSS)",
-                "risk": "MEDIUM",
-                "color": "#FFCC00", 
-                "advice": "1. Implement Content Security Policy (CSP).\n2. Encode/Escape output contextually."
-            }
-
-        
+            return {"type": "Cross-Site Scripting", "risk": "MEDIUM", "color": "#FFCC00", 
+                    "advice": "1. Implement CSP.\n2. Encode output contextually."}
         else:
-            return {
-                "type": "Unclassified / Reconnaissance",
-                "risk": "LOW",
-                "color": "#00CC44", 
-                "advice": "1. Block IP if rate limit exceeded.\n2. Monitor for follow-up attacks."
-            }
+            return {"type": "Reconnaissance / Scan", "risk": "LOW", "color": "#00CC44", 
+                    "advice": "1. Block IP if rate limit exceeded."}
 
 class ModernHoneyGuard(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        
-        self.title("HoneyGuard v2.0 | Global Threat Defense")
-        self.geometry("1100x750")
+        # Window Setup
+        self.title("HoneyGuard Final | Global Threat Map & Logger")
+        self.geometry("1200x800")
         
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
-        
+        # --- SIDEBAR ---
         self.sidebar_frame = ctk.CTkFrame(self, width=200, corner_radius=0)
         self.sidebar_frame.grid(row=0, column=0, sticky="nsew")
-        self.sidebar_frame.grid_rowconfigure(4, weight=1)
+        self.sidebar_frame.grid_rowconfigure(5, weight=1)
 
         self.logo_label = ctk.CTkLabel(self.sidebar_frame, text="🛡️ HoneyGuard", font=ctk.CTkFont(size=20, weight="bold"))
         self.logo_label.grid(row=0, column=0, padx=20, pady=(20, 10))
@@ -107,7 +79,7 @@ class ModernHoneyGuard(ctk.CTk):
         self.lbl_port = ctk.CTkLabel(self.sidebar_frame, text="Target Port:", anchor="w")
         self.lbl_port.grid(row=1, column=0, padx=20, pady=(10, 0))
         
-        self.entry_port = ctk.CTkEntry(self.sidebar_frame, placeholder_text="e.g. 8080")
+        self.entry_port = ctk.CTkEntry(self.sidebar_frame, placeholder_text="8080")
         self.entry_port.insert(0, "8080")
         self.entry_port.grid(row=2, column=0, padx=20, pady=(0, 20))
 
@@ -115,71 +87,90 @@ class ModernHoneyGuard(ctk.CTk):
         self.btn_start.grid(row=3, column=0, padx=20, pady=10)
 
         self.btn_stop = ctk.CTkButton(self.sidebar_frame, text="STOP SYSTEM", fg_color="#FF4444", hover_color="#CC0000", state="disabled", command=self.stop_server)
-        self.btn_stop.grid(row=4, column=0, padx=20, pady=10, sticky="n")
+        self.btn_stop.grid(row=4, column=0, padx=20, pady=10)
+        
+        # Simulation Button
+        self.btn_sim = ctk.CTkButton(self.sidebar_frame, text="⚠️ SIMULATE ATTACK", fg_color="#3B8ED0", hover_color="#1F6AA5", command=self.simulate_attack)
+        self.btn_sim.grid(row=5, column=0, padx=20, pady=10, sticky="s")
 
-       
-        self.main_frame = ctk.CTkFrame(self, corner_radius=0, fg_color="transparent")
+        # --- MAIN DASHBOARD ---
+        self.main_frame = ctk.CTkFrame(self, corner_radius=0, fg_color="#242424") 
         self.main_frame.grid(row=0, column=1, sticky="nsew", padx=20, pady=20)
 
+        # 1. Top Stats Row
+        self.stats_frame = ctk.CTkFrame(self.main_frame, fg_color="#242424") 
+        self.stats_frame.pack(fill="x", pady=(0, 10))
         
-        self.stats_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
-        self.stats_frame.pack(fill="x", pady=(0, 20))
-
-        self.card_status = self.create_stat_card(self.stats_frame, "System Status", "OFFLINE", "#888888")
+        self.card_status = self.create_stat_card(self.stats_frame, "Status", "OFFLINE", "#888888")
         self.card_status.pack(side="left", padx=(0, 10), expand=True, fill="x")
-        
-        self.card_attacks = self.create_stat_card(self.stats_frame, "Total Attacks", "0", "#3B8ED0")
+        self.card_attacks = self.create_stat_card(self.stats_frame, "Attacks", "0", "#3B8ED0")
         self.card_attacks.pack(side="left", padx=10, expand=True, fill="x")
-
-        self.card_last_risk = self.create_stat_card(self.stats_frame, "Last Threat Level", "None", "#888888")
+        self.card_last_risk = self.create_stat_card(self.stats_frame, "Threat Level", "None", "#888888")
         self.card_last_risk.pack(side="left", padx=(10, 0), expand=True, fill="x")
 
-        
-        self.log_label = ctk.CTkLabel(self.main_frame, text="🛑 Live Global Intrusion Feed", font=ctk.CTkFont(size=16, weight="bold"))
-        self.log_label.pack(anchor="w", pady=(10, 5))
-        
-        self.log_box = ctk.CTkTextbox(self.main_frame, width=800, height=400, font=("Consolas", 12))
+        # 2. MAP WIDGET
+        self.map_label = ctk.CTkLabel(self.main_frame, text="🌍 Live Global Threat Map", font=ctk.CTkFont(size=16, weight="bold"))
+        self.map_label.pack(anchor="w", pady=(10, 5))
+
+        self.map_widget = TkinterMapView(self.main_frame, width=800, height=300, corner_radius=10)
+        self.map_widget.pack(fill="x", pady=(0, 10))
+        self.map_widget.set_tile_server("https://mt0.google.com/vt/lyrs=m&hl=en&x={x}&y={y}&z={z}&s=Ga", max_zoom=22)
+        self.map_widget.set_position(20, 0)
+        self.map_widget.set_zoom(2)
+
+        # 3. Log Feed
+        self.log_label = ctk.CTkLabel(self.main_frame, text="🛑 Intrusion Logs (Saving to honeyguard_logs.txt)", font=ctk.CTkFont(size=14, weight="bold"))
+        self.log_label.pack(anchor="w", pady=(5, 5))
+        self.log_box = ctk.CTkTextbox(self.main_frame, width=800, height=200, font=("Consolas", 12))
         self.log_box.pack(fill="both", expand=True)
-        self.log_box.insert("0.0", "System ready. Initializing geolocation services...\n")
         
         self.server_socket = None
         self.running = False
         self.attack_count = 0
 
     def create_stat_card(self, parent, title, value, color):
-        frame = ctk.CTkFrame(parent, height=100)
+        frame = ctk.CTkFrame(parent, height=80)
         lbl_title = ctk.CTkLabel(frame, text=title, font=("Arial", 12))
-        lbl_title.pack(pady=(10, 0))
-        lbl_value = ctk.CTkLabel(frame, text=value, font=("Arial", 28, "bold"), text_color=color)
-        lbl_value.pack(pady=(0, 10))
+        lbl_title.pack(pady=(5, 0))
+        lbl_value = ctk.CTkLabel(frame, text=value, font=("Arial", 24, "bold"), text_color=color)
+        lbl_value.pack(pady=(0, 5))
         return frame
 
     def update_stat(self, card_frame, new_value, color=None):
         children = card_frame.winfo_children()
         children[1].configure(text=new_value)
-        if color:
-            children[1].configure(text_color=color)
+        if color: children[1].configure(text_color=color)
 
+    # --- NEW LOGGING FUNCTION WITH FILE SAVE ---
     def log(self, message):
+        # 1. Create a detailed timestamp
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        log_entry = f"[{timestamp}] {message}"
+
+        # 2. Update UI (Visual Log)
         self.log_box.configure(state="normal")
-        self.log_box.insert("end", f"[{datetime.now().strftime('%H:%M:%S')}] {message}\n")
+        self.log_box.insert("end", log_entry + "\n")
         self.log_box.see("end")
         self.log_box.configure(state="disabled")
+
+        # 3. Save to File (Persistent Log)
+        # "a" means Append mode (add to end of file, don't overwrite)
+        try:
+            with open("honeyguard_logs.txt", "a", encoding="utf-8") as f:
+                f.write(log_entry + "\n")
+        except Exception as e:
+            print(f"Error saving to file: {e}")
 
     def start_thread(self):
         try:
             port = int(self.entry_port.get())
         except ValueError:
-            self.log("Error: Invalid Port Number")
+            self.log("Error: Invalid Port")
             return
-
         self.running = True
         self.btn_start.configure(state="disabled")
         self.btn_stop.configure(state="normal")
-        self.entry_port.configure(state="disabled")
-        
         self.update_stat(self.card_status, "ACTIVE", "#2CC985")
-        
         t = threading.Thread(target=self.run_honeypot, args=(port,))
         t.daemon = True
         t.start()
@@ -187,115 +178,89 @@ class ModernHoneyGuard(ctk.CTk):
     def stop_server(self):
         self.running = False
         if self.server_socket:
-            try:
-                self.server_socket.close()
-            except:
-                pass
+            try: self.server_socket.close()
+            except: pass
         self.update_stat(self.card_status, "STOPPED", "#FF4444")
         self.btn_start.configure(state="normal")
         self.btn_stop.configure(state="disabled")
-        self.entry_port.configure(state="normal")
-        self.log("System manually stopped.")
 
     def run_honeypot(self, port):
-        self.log(f"Initializing sensor on port {port}...")
+        self.log(f"Sensor initialized on port {port}...")
+        self.log("Log file active: honeyguard_logs.txt")
         try:
             self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.server_socket.bind(('0.0.0.0', port))
             self.server_socket.listen(5)
-            self.log("Honeypot Active. Waiting for global connections...")
-            
+            self.log("Waiting for global connections...")
             while self.running:
                 try:
                     client, addr = self.server_socket.accept()
-                    self.handle_intrusion(client, addr)
-                except OSError:
-                    break
+                    self.process_attack(client, addr[0])
+                except OSError: break
         except Exception as e:
-            self.log(f"CRITICAL ERROR: {e}")
+            self.log(f"Error: {e}")
             self.stop_server()
 
-    def handle_intrusion(self, client, addr):
-        ip = addr[0]
+    def simulate_attack(self):
+        fake_ips = ["1.1.1.1", "8.8.8.8", "223.5.5.5", "95.163.212.192", "194.71.107.25"]
+        fake_ip = random.choice(fake_ips)
+        self.log(f"--- SIMULATING ATTACK FROM {fake_ip} ---")
+        t = threading.Thread(target=self.process_attack, args=(None, fake_ip, True))
+        t.start()
+
+    def process_attack(self, client, ip, is_simulation=False):
         self.attack_count += 1
-        
-      
         self.after(0, lambda: self.update_stat(self.card_attacks, str(self.attack_count)))
         
+        geo_data = ThreatIntel.get_location_data(ip)
+        payload = "SIMULATED_SQL_INJECTION"
         
-        location = ThreatIntel.get_location(ip)
-
-        try:
-            client.settimeout(3)
-            client.send(b"Server Ready.\r\n")
-            payload = client.recv(1024).decode('utf-8', errors='ignore').strip()
-        except:
-            payload = "EMPTY_PAYLOAD"
-
-       
+        if not is_simulation and client:
+            try:
+                client.settimeout(3)
+                client.send(b"Server Ready.\r\n")
+                payload = client.recv(1024).decode('utf-8', errors='ignore').strip()
+                client.close()
+            except: payload = "EMPTY"
+        
         analysis = ThreatIntel.analyze(payload)
+        self.after(0, lambda: self.update_map_and_ui(ip, geo_data, analysis, payload))
+
+    def update_map_and_ui(self, ip, geo, analysis, payload):
+        loc_str = f"{geo.get('country', 'Unknown')} ({geo.get('city', '?')})"
         
-       
-        log_msg = f"DETECTED: {ip} from {location} | Type: {analysis['type']}"
-        self.after(0, lambda: self.log(log_msg))
-        self.after(0, lambda: self.update_stat(self.card_last_risk, analysis['risk'], analysis['color']))
+        # This calls the updated log function which writes to the file
+        self.log(f"DETECTED: {ip} | {loc_str} | {analysis['type']}")
         
+        self.update_stat(self.card_last_risk, analysis['risk'], analysis['color'])
         
-        self.after(0, lambda: self.show_alert_popup(ip, location, payload, analysis))
+        if geo['status'] == 'success':
+            self.map_widget.set_position(geo['lat'], geo['lon'])
+            self.map_widget.set_zoom(5)
+            self.map_widget.set_marker(geo['lat'], geo['lon'], text=f"Attacker: {ip}")
         
-        client.close()
+        self.show_alert_popup(ip, loc_str, payload, analysis)
 
     def show_alert_popup(self, ip, location, payload, analysis):
         popup = ctk.CTkToplevel(self)
-        popup.title(" INTRUSION ALERT")
-        popup.geometry("500x500")
+        popup.title("⚠️ INTRUSION ALERT")
+        popup.geometry("500x400")
         popup.attributes("-topmost", True) 
 
-       
-        lbl_header = ctk.CTkLabel(popup, text=f"THREAT DETECTED: {analysis['type']}", 
-                                  font=("Arial", 18, "bold"), text_color=analysis['color'])
-        lbl_header.pack(pady=10)
+        ctk.CTkLabel(popup, text=f"THREAT DETECTED: {analysis['type']}", 
+                     font=("Arial", 16, "bold"), text_color=analysis['color']).pack(pady=10)
+        
+        info = ctk.CTkFrame(popup)
+        info.pack(fill="x", padx=20)
+        ctk.CTkLabel(info, text=f"IP: {ip} | {location}", font=("Arial", 12)).pack(anchor="w", padx=10, pady=5)
+        
+        ctk.CTkTextbox(info, height=50).pack(fill="x", padx=10)
 
-     
-        info_frame = ctk.CTkFrame(popup)
-        info_frame.pack(fill="x", padx=20)
-        
-        ctk.CTkLabel(info_frame, text=f"Attacker IP: {ip}", font=("Arial", 14, "bold")).pack(anchor="w", padx=10, pady=(5,0))
-        
-        ctk.CTkLabel(info_frame, text=f"Origin: {location}", font=("Arial", 12)).pack(anchor="w", padx=10, pady=(0,5))
-        
-        ctk.CTkLabel(info_frame, text=f"Risk Level: {analysis['risk']}", text_color=analysis['color']).pack(anchor="w", padx=10)
-        
-        ctk.CTkLabel(info_frame, text=f"Payload Caught:", font=("Arial", 12, "bold")).pack(anchor="w", padx=10, pady=(10,0))
-        payload_box = ctk.CTkTextbox(info_frame, height=60)
-        payload_box.insert("0.0", payload)
-        payload_box.configure(state="disabled")
-        payload_box.pack(fill="x", padx=10, pady=5)
-
-        
-        advice_frame = ctk.CTkFrame(popup, fg_color="#2b2b2b", border_color=analysis['color'], border_width=2)
-        advice_frame.pack(fill="both", expand=True, padx=20, pady=10)
-        
-        ctk.CTkLabel(advice_frame, text=" MITIGATION ADVICE:", text_color="white", font=("Arial", 12, "bold")).pack(anchor="w", padx=10, pady=5)
-        ctk.CTkLabel(advice_frame, text=analysis['advice'], text_color="#dddddd", justify="left").pack(anchor="w", padx=10)
-
-        
-        btn_frame = ctk.CTkFrame(popup, fg_color="transparent")
+        btn_frame = ctk.CTkFrame(popup, fg_color="transparent") 
         btn_frame.pack(fill="x", pady=10)
-        
-        btn_block = ctk.CTkButton(btn_frame, text=" BLOCK IP", fg_color="#FF4444", hover_color="#880000", width=180,
-                                  command=lambda: self.execute_block(ip, popup))
-        btn_block.pack(side="left", padx=20)
 
-        btn_ignore = ctk.CTkButton(btn_frame, text="Dismiss", fg_color="transparent", border_width=1, width=100,
-                                   command=popup.destroy)
-        btn_ignore.pack(side="right", padx=20)
-
-    def execute_block(self, ip, popup_window):
-        self.log(f" EXECUTING DEFENSE: Blocking {ip} via Windows Firewall...")
-        
-        self.log(f" Success: Rule 'Block_{ip}' created.")
-        popup_window.destroy()
+        btn = ctk.CTkButton(popup, text="CLOSE", command=popup.destroy, fg_color="#444444")
+        btn.pack(pady=10)
 
 if __name__ == "__main__":
     app = ModernHoneyGuard()
