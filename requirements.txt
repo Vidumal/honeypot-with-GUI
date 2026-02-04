@@ -1,0 +1,4 @@
+customtkinter
+tkintermapview
+requests
+pillow
