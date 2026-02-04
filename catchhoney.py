@@ -3,6 +3,7 @@ import socket
 import threading
 from datetime import datetime
 import time
+import requests
 
 
 ctk.set_appearance_mode("Dark")  
@@ -13,17 +14,39 @@ class ThreatIntel:
     The 'Brain' of the system. Matches attack payloads to known signatures
     and provides industry-standard mitigation advice.
     """
+
+    @staticmethod
+    def get_location(ip_address):
+        """
+        Fetches the geolocation of the IP address using a free API.
+        """
+        
+        if ip_address == "127.0.0.1" or ip_address == "localhost":
+            return "Localhost (Test Lab)"
+
+        try:
+            
+            url = f"http://ip-api.com/json/{ip_address}"
+            response = requests.get(url, timeout=5).json()
+            
+            if response['status'] == 'success':
+                return f"{response['country']} ({response['city']})"
+            else:
+                return "Unknown Location"
+        except Exception as e:
+            return "Lookup Failed"
+    
     @staticmethod
     def analyze(payload):
         payload = payload.lower()
         
-        
+       
         if any(x in payload for x in ["select *", "union select", "' or 1=1", "drop table", "--"]):
             return {
                 "type": "SQL Injection (SQLi)",
                 "risk": "CRITICAL",
                 "color": "#FF3333", 
-                "advice": "1. Implement Prepared Statements (Parameterized Queries).\n2. Activate Web Application Firewall (WAF) rules for SQLi.\n3. Sanitize all user inputs."
+                "advice": "1. Implement Prepared Statements (Parameterized Queries).\n2. Activate Web Application Firewall (WAF).\n3. Sanitize inputs."
             }
             
         
@@ -32,7 +55,7 @@ class ThreatIntel:
                 "type": "Remote Code Execution (RCE)",
                 "risk": "EXTREME",
                 "color": "#8B0000", 
-                "advice": "1. Disable shell execution functions (exec, system).\n2. Run service with least-privilege user.\n3. Isolate system in a DMZ."
+                "advice": "1. Disable shell execution functions.\n2. Run service with least-privilege.\n3. Isolate system in a DMZ."
             }
             
         
@@ -41,7 +64,7 @@ class ThreatIntel:
                 "type": "Directory Traversal",
                 "risk": "HIGH",
                 "color": "#FF8800",
-                "advice": "1. Validate file paths against an allowlist.\n2. Disable directory browsing on the web server.\n3. Use chroot jails."
+                "advice": "1. Validate file paths against an allowlist.\n2. Disable directory browsing.\n3. Use chroot jails."
             }
             
         
@@ -50,7 +73,7 @@ class ThreatIntel:
                 "type": "Cross-Site Scripting (XSS)",
                 "risk": "MEDIUM",
                 "color": "#FFCC00", 
-                "advice": "1. Implement Content Security Policy (CSP).\n2. Encode/Escape output contextually.\n3. Use HttpOnly cookies."
+                "advice": "1. Implement Content Security Policy (CSP).\n2. Encode/Escape output contextually."
             }
 
         
@@ -59,17 +82,16 @@ class ThreatIntel:
                 "type": "Unclassified / Reconnaissance",
                 "risk": "LOW",
                 "color": "#00CC44", 
-                "advice": "1. Block IP address if rate limit exceeded.\n2. Monitor for follow-up attacks."
+                "advice": "1. Block IP if rate limit exceeded.\n2. Monitor for follow-up attacks."
             }
 
 class ModernHoneyGuard(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-       
-        self.title("HoneyGuard | Enterprise Threat Defense")
-        self.geometry("1100x700")
         
+        self.title("HoneyGuard v2.0 | Global Threat Defense")
+        self.geometry("1100x750")
         
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
@@ -79,7 +101,7 @@ class ModernHoneyGuard(ctk.CTk):
         self.sidebar_frame.grid(row=0, column=0, sticky="nsew")
         self.sidebar_frame.grid_rowconfigure(4, weight=1)
 
-        self.logo_label = ctk.CTkLabel(self.sidebar_frame, text=" HoneyGuard", font=ctk.CTkFont(size=20, weight="bold"))
+        self.logo_label = ctk.CTkLabel(self.sidebar_frame, text="🛡️ HoneyGuard", font=ctk.CTkFont(size=20, weight="bold"))
         self.logo_label.grid(row=0, column=0, padx=20, pady=(20, 10))
 
         self.lbl_port = ctk.CTkLabel(self.sidebar_frame, text="Target Port:", anchor="w")
@@ -95,7 +117,7 @@ class ModernHoneyGuard(ctk.CTk):
         self.btn_stop = ctk.CTkButton(self.sidebar_frame, text="STOP SYSTEM", fg_color="#FF4444", hover_color="#CC0000", state="disabled", command=self.stop_server)
         self.btn_stop.grid(row=4, column=0, padx=20, pady=10, sticky="n")
 
-        
+       
         self.main_frame = ctk.CTkFrame(self, corner_radius=0, fg_color="transparent")
         self.main_frame.grid(row=0, column=1, sticky="nsew", padx=20, pady=20)
 
@@ -106,20 +128,19 @@ class ModernHoneyGuard(ctk.CTk):
         self.card_status = self.create_stat_card(self.stats_frame, "System Status", "OFFLINE", "#888888")
         self.card_status.pack(side="left", padx=(0, 10), expand=True, fill="x")
         
-        self.card_attacks = self.create_stat_card(self.stats_frame, "Total Attacks Detected", "0", "#3B8ED0")
+        self.card_attacks = self.create_stat_card(self.stats_frame, "Total Attacks", "0", "#3B8ED0")
         self.card_attacks.pack(side="left", padx=10, expand=True, fill="x")
 
         self.card_last_risk = self.create_stat_card(self.stats_frame, "Last Threat Level", "None", "#888888")
         self.card_last_risk.pack(side="left", padx=(10, 0), expand=True, fill="x")
 
         
-        self.log_label = ctk.CTkLabel(self.main_frame, text=" Live Intrusion Feed", font=ctk.CTkFont(size=16, weight="bold"))
+        self.log_label = ctk.CTkLabel(self.main_frame, text="🛑 Live Global Intrusion Feed", font=ctk.CTkFont(size=16, weight="bold"))
         self.log_label.pack(anchor="w", pady=(10, 5))
         
         self.log_box = ctk.CTkTextbox(self.main_frame, width=800, height=400, font=("Consolas", 12))
         self.log_box.pack(fill="both", expand=True)
-        self.log_box.insert("0.0", "System ready. Waiting to initialize honeypot...\n")
-        
+        self.log_box.insert("0.0", "System ready. Initializing geolocation services...\n")
         
         self.server_socket = None
         self.running = False
@@ -134,9 +155,7 @@ class ModernHoneyGuard(ctk.CTk):
         return frame
 
     def update_stat(self, card_frame, new_value, color=None):
-        
         children = card_frame.winfo_children()
-        
         children[1].configure(text=new_value)
         if color:
             children[1].configure(text_color=color)
@@ -161,7 +180,6 @@ class ModernHoneyGuard(ctk.CTk):
         
         self.update_stat(self.card_status, "ACTIVE", "#2CC985")
         
-        
         t = threading.Thread(target=self.run_honeypot, args=(port,))
         t.daemon = True
         t.start()
@@ -185,7 +203,7 @@ class ModernHoneyGuard(ctk.CTk):
             self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.server_socket.bind(('0.0.0.0', port))
             self.server_socket.listen(5)
-            self.log("Honeypot Active. Stealth Mode engaged.")
+            self.log("Honeypot Active. Waiting for global connections...")
             
             while self.running:
                 try:
@@ -201,12 +219,14 @@ class ModernHoneyGuard(ctk.CTk):
         ip = addr[0]
         self.attack_count += 1
         
-        
+      
         self.after(0, lambda: self.update_stat(self.card_attacks, str(self.attack_count)))
         
+        
+        location = ThreatIntel.get_location(ip)
+
         try:
             client.settimeout(3)
-           
             client.send(b"Server Ready.\r\n")
             payload = client.recv(1024).decode('utf-8', errors='ignore').strip()
         except:
@@ -215,20 +235,20 @@ class ModernHoneyGuard(ctk.CTk):
        
         analysis = ThreatIntel.analyze(payload)
         
-        
-        self.after(0, lambda: self.log(f"DETECTED: {ip} | Type: {analysis['type']}"))
+       
+        log_msg = f"DETECTED: {ip} from {location} | Type: {analysis['type']}"
+        self.after(0, lambda: self.log(log_msg))
         self.after(0, lambda: self.update_stat(self.card_last_risk, analysis['risk'], analysis['color']))
         
         
-        self.after(0, lambda: self.show_alert_popup(ip, payload, analysis))
+        self.after(0, lambda: self.show_alert_popup(ip, location, payload, analysis))
         
         client.close()
 
-    def show_alert_popup(self, ip, payload, analysis):
-        
+    def show_alert_popup(self, ip, location, payload, analysis):
         popup = ctk.CTkToplevel(self)
         popup.title(" INTRUSION ALERT")
-        popup.geometry("500x450")
+        popup.geometry("500x500")
         popup.attributes("-topmost", True) 
 
        
@@ -236,14 +256,17 @@ class ModernHoneyGuard(ctk.CTk):
                                   font=("Arial", 18, "bold"), text_color=analysis['color'])
         lbl_header.pack(pady=10)
 
-        
+     
         info_frame = ctk.CTkFrame(popup)
         info_frame.pack(fill="x", padx=20)
         
-        ctk.CTkLabel(info_frame, text=f"Attacker IP: {ip}", font=("Arial", 14, "bold")).pack(anchor="w", padx=10, pady=5)
-        ctk.CTkLabel(info_frame, text=f"Risk Level: {analysis['risk']}", text_color=analysis['color']).pack(anchor="w", padx=10)
-        ctk.CTkLabel(info_frame, text=f"Payload Caught:", font=("Arial", 12, "bold")).pack(anchor="w", padx=10, pady=(10,0))
+        ctk.CTkLabel(info_frame, text=f"Attacker IP: {ip}", font=("Arial", 14, "bold")).pack(anchor="w", padx=10, pady=(5,0))
         
+        ctk.CTkLabel(info_frame, text=f"Origin: {location}", font=("Arial", 12)).pack(anchor="w", padx=10, pady=(0,5))
+        
+        ctk.CTkLabel(info_frame, text=f"Risk Level: {analysis['risk']}", text_color=analysis['color']).pack(anchor="w", padx=10)
+        
+        ctk.CTkLabel(info_frame, text=f"Payload Caught:", font=("Arial", 12, "bold")).pack(anchor="w", padx=10, pady=(10,0))
         payload_box = ctk.CTkTextbox(info_frame, height=60)
         payload_box.insert("0.0", payload)
         payload_box.configure(state="disabled")
@@ -253,14 +276,14 @@ class ModernHoneyGuard(ctk.CTk):
         advice_frame = ctk.CTkFrame(popup, fg_color="#2b2b2b", border_color=analysis['color'], border_width=2)
         advice_frame.pack(fill="both", expand=True, padx=20, pady=10)
         
-        ctk.CTkLabel(advice_frame, text=" RECOMMENDED ACTION:", text_color="white", font=("Arial", 12, "bold")).pack(anchor="w", padx=10, pady=5)
+        ctk.CTkLabel(advice_frame, text=" MITIGATION ADVICE:", text_color="white", font=("Arial", 12, "bold")).pack(anchor="w", padx=10, pady=5)
         ctk.CTkLabel(advice_frame, text=analysis['advice'], text_color="#dddddd", justify="left").pack(anchor="w", padx=10)
 
         
         btn_frame = ctk.CTkFrame(popup, fg_color="transparent")
         btn_frame.pack(fill="x", pady=10)
         
-        btn_block = ctk.CTkButton(btn_frame, text=" BLOCK IP (Firewall)", fg_color="#FF4444", hover_color="#880000", width=200,
+        btn_block = ctk.CTkButton(btn_frame, text=" BLOCK IP", fg_color="#FF4444", hover_color="#880000", width=180,
                                   command=lambda: self.execute_block(ip, popup))
         btn_block.pack(side="left", padx=20)
 
@@ -269,9 +292,9 @@ class ModernHoneyGuard(ctk.CTk):
         btn_ignore.pack(side="right", padx=20)
 
     def execute_block(self, ip, popup_window):
+        self.log(f" EXECUTING DEFENSE: Blocking {ip} via Windows Firewall...")
         
-        self.log(f"🛡️ EXECUTING DEFENSE: Blocking {ip} via Windows Firewall...")
-        self.log(f"✅ Success: Rule 'Block_{ip}' created.")
+        self.log(f" Success: Rule 'Block_{ip}' created.")
         popup_window.destroy()
 
 if __name__ == "__main__":
