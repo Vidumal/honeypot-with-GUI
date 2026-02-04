@@ -5,15 +5,19 @@ from datetime import datetime
 import time
 import requests
 import random
-import os  
+import os
 from tkintermapview import TkinterMapView
-
 
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("dark-blue")
 
 
-DESKTOP_PATH = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
+if os.name == 'nt': 
+    DESKTOP_PATH = os.path.join(os.environ['USERPROFILE'], 'Desktop')
+else:  
+    
+    DESKTOP_PATH = "."
+
 LOG_FILE_PATH = os.path.join(DESKTOP_PATH, "honeyguard_logs.txt")
 
 class ThreatIntel:
@@ -50,7 +54,7 @@ class ModernHoneyGuard(ctk.CTk):
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
-   
+
         self.sidebar_frame = ctk.CTkFrame(self, width=200, corner_radius=0)
         self.sidebar_frame.grid(row=0, column=0, sticky="nsew")
         self.sidebar_frame.grid_rowconfigure(6, weight=1) 
@@ -71,14 +75,13 @@ class ModernHoneyGuard(ctk.CTk):
         self.btn_stop = ctk.CTkButton(self.sidebar_frame, text="STOP SYSTEM", fg_color="#FF4444", hover_color="#CC0000", state="disabled", command=self.stop_server)
         self.btn_stop.grid(row=4, column=0, padx=20, pady=10)
         
-     
         self.btn_folder = ctk.CTkButton(self.sidebar_frame, text=" OPEN LOG FILE", fg_color="#555555", hover_color="#333333", command=self.open_log_file)
         self.btn_folder.grid(row=5, column=0, padx=20, pady=10)
 
         self.btn_sim = ctk.CTkButton(self.sidebar_frame, text=" SIMULATE ATTACK", fg_color="#3B8ED0", hover_color="#1F6AA5", command=self.simulate_attack)
         self.btn_sim.grid(row=6, column=0, padx=20, pady=10, sticky="s")
 
-      
+
         self.main_frame = ctk.CTkFrame(self, corner_radius=0, fg_color="#242424") 
         self.main_frame.grid(row=0, column=1, sticky="nsew", padx=20, pady=20)
 
@@ -91,7 +94,7 @@ class ModernHoneyGuard(ctk.CTk):
         self.card_last_risk = self.create_stat_card(self.stats_frame, "Threat Level", "None", "#888888")
         self.card_last_risk.pack(side="left", padx=(10, 0), expand=True, fill="x")
 
-        self.map_label = ctk.CTkLabel(self.main_frame, text=" Live Global Threat Map", font=ctk.CTkFont(size=16, weight="bold"))
+        self.map_label = ctk.CTkLabel(self.main_frame, text="🌍 Live Global Threat Map", font=ctk.CTkFont(size=16, weight="bold"))
         self.map_label.pack(anchor="w", pady=(10, 5))
         self.map_widget = TkinterMapView(self.main_frame, width=800, height=300, corner_radius=10)
         self.map_widget.pack(fill="x", pady=(0, 10))
@@ -99,7 +102,6 @@ class ModernHoneyGuard(ctk.CTk):
         self.map_widget.set_position(20, 0)
         self.map_widget.set_zoom(2)
 
-      
         self.log_label = ctk.CTkLabel(self.main_frame, text=f" Intrusion Logs ({LOG_FILE_PATH})", font=ctk.CTkFont(size=12, weight="bold"))
         self.log_label.pack(anchor="w", pady=(5, 5))
         self.log_box = ctk.CTkTextbox(self.main_frame, width=800, height=200, font=("Consolas", 12))
@@ -109,7 +111,7 @@ class ModernHoneyGuard(ctk.CTk):
         self.running = False
         self.attack_count = 0
         
-       
+
         print(f"DEBUG: Trying to create file at: {LOG_FILE_PATH}")
         try:
             with open(LOG_FILE_PATH, "a") as f:
@@ -133,31 +135,27 @@ class ModernHoneyGuard(ctk.CTk):
         children[1].configure(text=new_value)
         if color: children[1].configure(text_color=color)
 
-  
     def log(self, message):
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         log_entry = f"[{timestamp}] {message}"
-       
+        
         self.log_box.configure(state="normal")
         self.log_box.insert("end", log_entry + "\n")
         self.log_box.see("end")
         self.log_box.configure(state="disabled")
         
-      
         try:
             with open(LOG_FILE_PATH, "a", encoding="utf-8") as f:
                 f.write(log_entry + "\n")
         except Exception as e: 
             print(f"File Write Error: {e}")
 
-    
     def open_log_file(self):
-        """Opens the log file itself"""
         try:
             os.startfile(LOG_FILE_PATH)
         except:
-            
-            os.startfile(DESKTOP_PATH)
+            if os.name == 'nt':
+                os.startfile(DESKTOP_PATH)
 
     def start_thread(self):
         try: port = int(self.entry_port.get())
@@ -244,6 +242,45 @@ class ModernHoneyGuard(ctk.CTk):
         btn = ctk.CTkButton(popup, text="CLOSE", command=popup.destroy, fg_color="#444444")
         btn.pack(pady=10)
 
+
+def run_headless(port=8080):
+    print(f"--- HEADLESS MODE ACTIVE ---")
+    print(f"HoneyGuard running in Docker/CLI on port {port}")
+    print(f"Logs will be saved to: {LOG_FILE_PATH}")
+    
+    
+    try:
+        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server_socket.bind(('0.0.0.0', port))
+        server_socket.listen(5)
+        
+        while True:
+            try:
+                client, addr = server_socket.accept()
+                ip = addr[0]
+                timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                print(f"[{timestamp}] DOINK! Connection from {ip}")
+                
+         
+                with open(LOG_FILE_PATH, "a") as f:
+                    f.write(f"[{timestamp}] Connection from {ip}\n")
+                    
+                client.close()
+            except Exception as inner_e:
+                print(f"Connection Error: {inner_e}")
+                
+    except Exception as e:
+        print(f"Server Error: {e}")
+
+
 if __name__ == "__main__":
-    app = ModernHoneyGuard()
-    app.mainloop()
+    
+    try:
+        app = ModernHoneyGuard()
+        app.mainloop()
+    except Exception as e:
+       
+        if "no display name" in str(e) or "TclError" in str(e):
+            run_headless(port=8080)
+        else:
+            print(f"Critical Error: {e}")
